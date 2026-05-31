@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +15,9 @@
         table{width:100%;border-collapse:collapse;}
         th,td{border:1px solid #ddd;padding:8px;text-align:left;}
         th{background:#ff7e00;color:white;}
-        .suspend{background:#e74c3c;color:white;border:none;padding:5px 10px;border-radius:8px;}
+        .green-dot{display:inline-block;width:14px;height:14px;background:green;border-radius:50%;margin-right:8px;}
+        .red-dot{display:inline-block;width:14px;height:14px;background:red;border-radius:50%;margin-right:8px;}
+        .add-btn{background:#2ecc71;font-size:1.5rem;font-weight:bold;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:10px 0;}
     </style>
 </head>
 <body>
@@ -26,76 +29,141 @@
         <button onclick="adminLogin()">Login</button>
         <p>Demo: admin / admin123</p>
     </div>
+
     <div id="adminDashboard" style="display:none;">
         <div class="card">
-            <h2>🛠️ Admin Dashboard <button onclick="adminLogout()">Logout</button></h2>
-            <h3>Add Bus</h3>
-            <input id="newCompany" placeholder="Company"><input id="newFrom" placeholder="From"><input id="newTo" placeholder="To">
-            <input id="newDeparture" type="time"><input id="newDuration" placeholder="Duration"><input id="newPrice" type="number" placeholder="Price"><input id="newSeats" type="number" placeholder="Seats">
-            <button onclick="adminAddBus()">Add Bus</button>
-        </div>
-        <div class="card">
-            <h3>All Buses</h3>
-            <table><thead><tr><th>ID</th><th>Company</th><th>Route</th><th>Price</th><th>Status</th><th>Action</th></tr></thead><tbody id="busesTbody"></tbody></table>
-        </div>
-        <div class="card">
-            <h3>Company Subscriptions</h3>
-            <table><thead><tr><th>Company</th><th>Paid?</th><th>Action</th></tr></thead><tbody id="subsTbody"></tbody></table>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>🛠️ Admin Dashboard</h2>
+                <button onclick="adminLogout()">Logout</button>
+            </div>
+            <button class="add-btn" onclick="showAddCompanyModal()">+</button>
+            <h3>📋 Companies & Payment Status</h3>
+            <table id="companiesTable">
+                <thead><tr><th>Company</th><th>Payment Status</th><th>Suspended</th><th>Actions</th></tr></thead>
+                <tbody id="companiesTbody"></tbody>
+            </table>
         </div>
     </div>
 </div>
+
+<!-- Modal for adding company -->
+<div id="addCompanyModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:100;">
+    <div style="background:white; border-radius:24px; padding:1.5rem; width:90%; max-width:400px;">
+        <h3>Add New Company</h3>
+        <input type="text" id="newCompanyName" placeholder="Company Name">
+        <button onclick="addCompany()">Create</button>
+        <button onclick="closeModal()" style="background:#999;">Cancel</button>
+    </div>
+</div>
+
 <script>
-    if (!localStorage.getItem('company_buses')) localStorage.setItem('company_buses', JSON.stringify([]));
     function adminLogin() {
-        let u = document.getElementById('adminUser').value, p = document.getElementById('adminPass').value;
+        let u = document.getElementById('adminUser').value;
+        let p = document.getElementById('adminPass').value;
         if (u === "admin" && p === "admin123") {
             document.getElementById('adminLogin').style.display = 'none';
             document.getElementById('adminDashboard').style.display = 'block';
-            loadAllBuses(); loadSubscriptions();
+            loadCompanies();
         } else alert("Invalid");
     }
-    function loadAllBuses() {
-        let buses = JSON.parse(localStorage.getItem('company_buses'));
-        let tbody = document.getElementById('busesTbody');
-        if (!buses.length) { tbody.innerHTML = '<tr><td colspan="6">No buses</td></tr>'; return; }
-        let rows = '';
+
+    function loadCompanies() {
+        let buses = JSON.parse(localStorage.getItem('company_buses') || '[]');
+        let companiesMap = new Map();
         buses.forEach(b => {
-            rows += `<tr><td>${b.id}</td><td>${b.company}</td><td>${b.from}→${b.to}</td><td>$${b.price}</td><td>${b.suspended ? 'Suspended' : 'Active'}</td><td><button class="suspend" onclick="toggleSuspend(${b.id})">${b.suspended ? 'Activate' : 'Suspend'}</button></td></tr>`;
+            if (!companiesMap.has(b.company)) {
+                companiesMap.set(b.company, { suspended: b.suspended || false });
+            }
         });
-        tbody.innerHTML = rows;
-    }
-    function toggleSuspend(id) {
-        let buses = JSON.parse(localStorage.getItem('company_buses'));
-        let bus = buses.find(b => b.id === id);
-        bus.suspended = !bus.suspended;
-        localStorage.setItem('company_buses', JSON.stringify(buses));
-        loadAllBuses();
-    }
-    function adminAddBus() {
-        let company = document.getElementById('newCompany').value, from = document.getElementById('newFrom').value, to = document.getElementById('newTo').value;
-        let departure = document.getElementById('newDeparture').value, duration = document.getElementById('newDuration').value;
-        let price = parseInt(document.getElementById('newPrice').value), seats = parseInt(document.getElementById('newSeats').value);
-        if (!company || !from || !to || !price) { alert("Fill required"); return; }
-        let buses = JSON.parse(localStorage.getItem('company_buses'));
-        buses.push({ id: Date.now(), company, from, to, departure, duration, price, seats, available: seats, suspended: false });
-        localStorage.setItem('company_buses', JSON.stringify(buses));
-        alert("Bus added");
-        loadAllBuses();
-    }
-    function loadSubscriptions() {
-        let buses = JSON.parse(localStorage.getItem('company_buses'));
-        let companies = [...new Set(buses.map(b => b.company))];
-        let tbody = document.getElementById('subsTbody');
-        if (!companies.length) { tbody.innerHTML = '<tr><td colspan="3">No companies</td></tr>'; return; }
+        // Also include any companies that might have no buses yet? We'll add via admin.
+        let companies = Array.from(companiesMap.keys());
+        let tbody = document.getElementById('companiesTbody');
+        if (companies.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4">No companies</td></tr>';
+            return;
+        }
         let rows = '';
-        companies.forEach(c => {
-            let paid = localStorage.getItem(`sub_${c}`) === 'true' ? "Yes" : "No";
-            rows += `<tr><td>${c}</td><td>${paid}</td><td><button onclick="markPaid('${c}')">Mark Paid</button></td></tr>`;
+        companies.forEach(comp => {
+            let paid = localStorage.getItem(`sub_${comp}`) === 'true';
+            let suspended = companiesMap.get(comp).suspended;
+            rows += `<tr>
+                <td>${comp}</td>
+                <td><span class="${paid ? 'green-dot' : 'red-dot'}"></span> ${paid ? 'Paid' : 'Unpaid'}</td>
+                <td>${suspended ? 'Yes' : 'No'}</td>
+                <td>
+                    <button onclick="togglePayment('${comp}')">${paid ? 'Mark Unpaid' : 'Mark Paid'}</button>
+                    <button onclick="toggleSuspendCompany('${comp}')">${suspended ? 'Activate' : 'Suspend'}</button>
+                 </td>
+            </tr>`;
         });
         tbody.innerHTML = rows;
     }
-    function markPaid(company) { localStorage.setItem(`sub_${company}`, 'true'); loadSubscriptions(); }
-    function adminLogout() { document.getElementById('adminLogin').style.display = 'block'; document.getElementById('adminDashboard').style.display = 'none'; }
+
+    function togglePayment(company) {
+        let current = localStorage.getItem(`sub_${company}`) === 'true';
+        localStorage.setItem(`sub_${company}`, !current);
+        loadCompanies();
+    }
+
+    function toggleSuspendCompany(company) {
+        let buses = JSON.parse(localStorage.getItem('company_buses') || '[]');
+        // Suspend all buses of this company
+        buses = buses.map(b => {
+            if (b.company === company) {
+                b.suspended = !b.suspended;
+            }
+            return b;
+        });
+        localStorage.setItem('company_buses', JSON.stringify(buses));
+        loadCompanies();
+        alert(`Company ${company} toggled suspend status`);
+    }
+
+    function showAddCompanyModal() {
+        document.getElementById('addCompanyModal').style.display = 'flex';
+    }
+
+    function addCompany() {
+        let newCompany = document.getElementById('newCompanyName').value.trim();
+        if (!newCompany) { alert("Enter company name"); return; }
+        // Add a dummy bus for this company? Or just create a placeholder.
+        // We'll add a dummy bus so company appears in list.
+        let buses = JSON.parse(localStorage.getItem('company_buses') || '[]');
+        buses.push({
+            id: Date.now(),
+            company: newCompany,
+            from: "Placeholder",
+            to: "Route",
+            departure: "00:00",
+            duration: "0h",
+            price: 0,
+            seats: 1,
+            available: 0,
+            logo: "",
+            suspended: false
+        });
+        localStorage.setItem('company_buses', JSON.stringify(buses));
+        // Also set default credentials for new company (username: company name, password: company123)
+        // We'll store in separate credentials object
+        let allCredentials = JSON.parse(localStorage.getItem('all_company_creds') || '{}');
+        allCredentials[newCompany] = { username: newCompany.toLowerCase().replace(/\s/g,''), password: "company123" };
+        localStorage.setItem('all_company_creds', JSON.stringify(allCredentials));
+        // Also store payment status default unpaid
+        localStorage.setItem(`sub_${newCompany}`, 'false');
+        closeModal();
+        loadCompanies();
+        alert(`Company ${newCompany} added. Default login: username = ${newCompany.toLowerCase().replace(/\s/g,'')}, password = company123`);
+    }
+
+    function closeModal() {
+        document.getElementById('addCompanyModal').style.display = 'none';
+        document.getElementById('newCompanyName').value = '';
+    }
+
+    function adminLogout() {
+        document.getElementById('adminLogin').style.display = 'block';
+        document.getElementById('adminDashboard').style.display = 'none';
+    }
 </script>
 </body>
 </html>
