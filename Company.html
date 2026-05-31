@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Dashboard</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:system-ui;background:#f0f0f0;padding:1rem;color:#000;}
+        .container{max-width:1000px;margin:0 auto;}
+        .card{background:white;border-radius:20px;padding:1.5rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
+        input,button{width:100%;padding:10px;margin:6px 0;border-radius:12px;border:1px solid #ddd;}
+        button{background:#ff7e00;color:white;border:none;font-weight:bold;cursor:pointer;}
+        table{width:100%;border-collapse:collapse;margin-top:1rem;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background:#ff7e00;color:white;}
+        .bus-item{background:#f9f9f9;padding:1rem;margin-bottom:1rem;border-radius:16px;}
+        .logout{background:#333;}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="loginDiv" class="card">
+        <h2>Company Login</h2>
+        <input type="text" id="compUser" placeholder="Username">
+        <input type="password" id="compPass" placeholder="Password">
+        <button onclick="companyLogin()">Login</button>
+        <p>Demo: busco / bus123</p>
+    </div>
+
+    <div id="dashboardDiv" style="display:none;">
+        <div class="card">
+            <h2>🚌 Company Dashboard <button class="logout" onclick="logout()">Logout</button></h2>
+            <h3>➕ Add New Bus</h3>
+            <input type="text" id="newFrom" placeholder="From">
+            <input type="text" id="newTo" placeholder="To">
+            <input type="time" id="newDeparture">
+            <input type="text" id="newDuration" placeholder="Duration (e.g., 5h)">
+            <input type="number" id="newPrice" placeholder="Price">
+            <input type="number" id="newSeats" placeholder="Total seats">
+            <button onclick="addBus()">Add Bus</button>
+        </div>
+        <div class="card">
+            <h3>📋 Your Buses</h3>
+            <div id="busesList"></div>
+        </div>
+        <div class="card">
+            <h3>📖 Bookings</h3>
+            <table><thead><tr><th>Phone</th><th>Bus</th><th>Seats</th><th>Date</th><th>Code</th></tr></thead><tbody id="bookingsTbody"></tbody></table>
+        </div>
+    </div>
+</div>
+<script>
+    if (!localStorage.getItem('company_buses')) {
+        let defaultBuses = [
+            { id: 1, company: "Royal Express", from: "Lusaka", to: "Livingstone", departure: "08:00", duration: "7h", price: 45, seats: 40, available: 40 },
+            { id: 2, company: "Royal Express", from: "Lusaka", to: "Chipata", departure: "14:00", duration: "8h", price: 60, seats: 45, available: 45 }
+        ];
+        localStorage.setItem('company_buses', JSON.stringify(defaultBuses));
+    }
+    function companyLogin() {
+        let u = document.getElementById('compUser').value;
+        let p = document.getElementById('compPass').value;
+        if (u === "busco" && p === "bus123") {
+            document.getElementById('loginDiv').style.display = 'none';
+            document.getElementById('dashboardDiv').style.display = 'block';
+            loadCompanyBuses();
+            loadCompanyBookings();
+        } else alert("Invalid");
+    }
+    function loadCompanyBuses() {
+        let buses = JSON.parse(localStorage.getItem('company_buses')).filter(b => b.company === "Royal Express");
+        let container = document.getElementById('busesList');
+        if (!buses.length) { container.innerHTML = "<p>No buses</p>"; return; }
+        let html = '';
+        buses.forEach(b => {
+            html += `<div class="bus-item"><strong>${b.from}→${b.to}</strong> | Depart: ${b.departure} | Dur: ${b.duration}<br>Price: $${b.price} | Available: ${b.available}/${b.seats}<br>
+            <input type="number" id="newPrice_${b.id}" placeholder="New price"><button onclick="updateBus(${b.id})">Update Price</button></div>`;
+        });
+        container.innerHTML = html;
+    }
+    function updateBus(busId) {
+        let newPrice = document.getElementById(`newPrice_${busId}`).value;
+        let buses = JSON.parse(localStorage.getItem('company_buses'));
+        let index = buses.findIndex(b => b.id === busId);
+        if (newPrice) buses[index].price = parseInt(newPrice);
+        localStorage.setItem('company_buses', JSON.stringify(buses));
+        alert("Updated");
+        loadCompanyBuses();
+    }
+    function addBus() {
+        let from = document.getElementById('newFrom').value, to = document.getElementById('newTo').value;
+        let departure = document.getElementById('newDeparture').value, duration = document.getElementById('newDuration').value;
+        let price = parseInt(document.getElementById('newPrice').value), seats = parseInt(document.getElementById('newSeats').value);
+        if (!from || !to || !price) { alert("Fill fields"); return; }
+        let buses = JSON.parse(localStorage.getItem('company_buses'));
+        buses.push({ id: Date.now(), company: "Royal Express", from, to, departure, duration, price, seats, available: seats });
+        localStorage.setItem('company_buses', JSON.stringify(buses));
+        alert("Bus added");
+        loadCompanyBuses();
+    }
+    function loadCompanyBookings() {
+        let allBookings = JSON.parse(localStorage.getItem('customer_bookings') || '[]');
+        let myBookings = allBookings.filter(b => b.bus === "Royal Express");
+        let tbody = document.getElementById('bookingsTbody');
+        if (!myBookings.length) { tbody.innerHTML = '<tr><td colspan="5">No bookings</td></tr>'; return; }
+        let rows = '';
+        myBookings.forEach(b => { rows += `<tr><td>${b.phone}</td><td>${b.bus}</td><td>${b.seats.join(',')}</td><td>${b.date}</td><td>${b.code}</td></tr>`; });
+        tbody.innerHTML = rows;
+    }
+    function logout() { document.getElementById('loginDiv').style.display = 'block'; document.getElementById('dashboardDiv').style.display = 'none'; }
+</script>
+</body>
+</html>
