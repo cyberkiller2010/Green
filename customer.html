@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,30 +11,57 @@
         .container{max-width:600px;margin:0 auto;}
         .card{background:white;border-radius:24px;padding:1.5rem;margin-bottom:1rem;box-shadow:0 4px 12px rgba(0,0,0,0.05);}
         h2{color:#000;margin-bottom:1rem;}
+        .search-circle{display:flex;gap:10px;align-items:center;}
+        .search-circle input{flex:1;padding:12px;border:1px solid #ddd;border-radius:50px;font-size:1rem;}
+        .search-circle button{width:50px;height:50px;border-radius:50%;background:#ff7e00;color:white;border:none;font-size:1.2rem;cursor:pointer;}
         input,select,button{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:16px;font-size:1rem;background:white;color:#000;}
         button{background:#ff7e00;color:white;border:none;font-weight:bold;cursor:pointer;}
-        .bus-card{background:#fafafa;border-radius:16px;padding:1rem;margin-bottom:1rem;border-left:4px solid #ff7e00;}
+        .bus-card{background:#fafafa;border-radius:16px;padding:1rem;margin-bottom:1rem;border-left:4px solid #ff7e00;display:flex;align-items:center;gap:12px;}
+        .bus-logo{width:50px;height:50px;border-radius:12px;object-fit:cover;background:#eee;}
+        .bus-info{flex:1;}
+        .bus-info h3{font-size:1rem;margin-bottom:4px;}
+        .details-panel{background:#fff3e0;padding:12px;border-radius:16px;margin-top:10px;display:none;}
         .seat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:1rem 0;}
         .seat{background:#eee;text-align:center;padding:8px;border-radius:12px;cursor:pointer;color:#000;}
         .seat.selected{background:#ff7e00;color:white;}
         .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);justify-content:center;align-items:center;z-index:100;}
         .modal-content{background:white;border-radius:24px;padding:1.5rem;width:90%;max-width:400px;color:#000;}
-        .toast{position:fixed;bottom:20px;left:20px;right:20px;background:#333;color:white;text-align:center;padding:12px;border-radius:30px;display:none;}
-        .cancel-btn{background:#999;margin-top:8px;}
+        .toast{position:fixed;bottom:20px;left:20px;right:20px;background:#333;color:white;text-align:center;padding:12px;border-radius:30px;display:none;z-index:200;}
+        .history-item{background:#f9f9f9;padding:12px;border-radius:16px;margin-bottom:10px;border-left:3px solid #ff7e00;}
+        .delete-btn{background:#e74c3c;margin-top:10px;}
+        .flex-between{display:flex;justify-content:space-between;align-items:center;}
+        .small-text{font-size:0.8rem;color:#666;}
     </style>
 </head>
 <body>
 <div class="container">
     <div class="card">
         <h2>🚌 Find Your Bus</h2>
-        <input type="text" id="fromCity" placeholder="From" value="Lusaka">
-        <input type="text" id="toCity" placeholder="To" value="Livingstone">
+        <div class="search-circle">
+            <input type="text" id="searchInput" placeholder="Search by route or company...">
+            <button onclick="searchBuses()">🔍</button>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <input type="text" id="fromCity" placeholder="From" style="width:50%;">
+            <input type="text" id="toCity" placeholder="To" style="width:50%;">
+        </div>
         <input type="date" id="travelDate">
-        <button onclick="searchBuses()">🔍 Search</button>
+        <button onclick="searchBuses()">Search</button>
     </div>
+
     <div id="results"></div>
+
+    <!-- Recent Bookings Section -->
+    <div class="card" id="recentBookingsCard">
+        <div class="flex-between">
+            <h3>📋 Recent Bookings</h3>
+            <button id="clearHistoryBtn" style="width:auto; padding:8px 16px; background:#e74c3c;">Delete All</button>
+        </div>
+        <div id="recentBookingsList"></div>
+    </div>
 </div>
 
+<!-- Payment Modal -->
 <div id="paymentModal" class="modal">
     <div class="modal-content">
         <h3>Complete Payment</h3>
@@ -43,18 +71,19 @@
             <option value="airtel">Airtel Money</option>
             <option value="zamtel">Zamtel Kwik</option>
         </select>
-        <input type="tel" id="phoneNumber" placeholder="Phone number">
+        <input type="tel" id="phoneNumber" placeholder="Your phone number">
         <p>Total: $<span id="paymentTotal">0</span></p>
         <button onclick="processPayment()">Confirm Payment</button>
-        <button class="cancel-btn" onclick="closePaymentModal()">Cancel</button>
+        <button class="cancel-btn" onclick="closePaymentModal()" style="background:#999;">Cancel</button>
     </div>
 </div>
 
+<!-- Code Display Modal -->
 <div id="codeModal" class="modal">
     <div class="modal-content">
         <h3>✅ Booking Confirmed!</h3>
-        <p>Your unique travel code:</p>
-        <h1 id="uniqueCode" style="font-size:2rem;text-align:center;color:#ff7e00;">------</h1>
+        <p>Your unique 28-digit travel code:</p>
+        <h2 id="uniqueCode" style="font-size:1rem; word-break:break-all; background:#f0f0f0; padding:10px; border-radius:12px;">------</h2>
         <p>Present this code at the border.</p>
         <button onclick="closeCodeModal()">Close</button>
     </div>
@@ -63,21 +92,41 @@
 <div id="toast" class="toast"></div>
 
 <script>
-    let buses = [
-        { id: 1, company: "Royal Express", from: "Lusaka", to: "Livingstone", departure: "08:00", duration: "7h", price: 45, seats: 40, available: 40 },
-        { id: 2, company: "Mazhandu", from: "Lusaka", to: "Livingstone", departure: "14:00", duration: "6h 30m", price: 55, seats: 50, available: 50 },
-        { id: 3, company: "Power Tools", from: "Lusaka", to: "Chipata", departure: "06:00", duration: "8h", price: 60, seats: 45, available: 45 }
-    ];
+    // Load buses from localStorage (companies add buses with logos)
+    let buses = [];
+    function loadBusesFromStorage() {
+        const stored = localStorage.getItem('company_buses');
+        if (stored) {
+            buses = JSON.parse(stored);
+        } else {
+            // default demo buses with logos (placeholder emoji as image URL)
+            buses = [
+                { id: 1, company: "Royal Express", logo: "https://picsum.photos/50/50?random=1", from: "Lusaka", to: "Livingstone", departure: "08:00", duration: "7h", price: 45, seats: 40, available: 40 },
+                { id: 2, company: "Mazhandu", logo: "https://picsum.photos/50/50?random=2", from: "Lusaka", to: "Livingstone", departure: "14:00", duration: "6h 30m", price: 55, seats: 50, available: 50 },
+                { id: 3, company: "Power Tools", logo: "https://picsum.photos/50/50?random=3", from: "Lusaka", to: "Chipata", departure: "06:00", duration: "8h", price: 60, seats: 45, available: 45 }
+            ];
+            localStorage.setItem('company_buses', JSON.stringify(buses));
+        }
+    }
+    loadBusesFromStorage();
+
     let currentResults = [];
     let selectedBus = null;
     let selectedSeats = [];
+    let expandedBusId = null; // to show details only for selected bus
 
     document.getElementById('travelDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('fromCity').value = "Lusaka";
+    document.getElementById('toCity').value = "Livingstone";
 
     function searchBuses() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const from = document.getElementById('fromCity').value.toLowerCase();
         const to = document.getElementById('toCity').value.toLowerCase();
-        currentResults = buses.filter(b => b.from.toLowerCase().includes(from) && b.to.toLowerCase().includes(to));
+        currentResults = buses.filter(b => 
+            (b.from.toLowerCase().includes(from) && b.to.toLowerCase().includes(to)) &&
+            (b.company.toLowerCase().includes(searchTerm) || b.from.toLowerCase().includes(searchTerm) || b.to.toLowerCase().includes(searchTerm))
+        );
         displayBuses();
     }
 
@@ -89,17 +138,37 @@
         }
         let html = '';
         for (let bus of currentResults) {
+            const isFull = bus.available <= 0;
+            const seatStatus = isFull ? 'Bus Full' : `${bus.available} seats left`;
+            const showDetails = (expandedBusId === bus.id);
             html += `
                 <div class="card bus-card">
-                    <h3>${bus.company}</h3>
-                    <p>${bus.from} → ${bus.to}</p>
-                    <p>Departure: ${bus.departure} | Duration: ${bus.duration}</p>
-                    <p>Price: $${bus.price} | Seats left: ${bus.available}</p>
-                    <button onclick="openSeatSelection(${bus.id})">Select Seats</button>
+                    <img class="bus-logo" src="${bus.logo || 'https://via.placeholder.com/50'}" alt="logo" onerror="this.src='https://via.placeholder.com/50'">
+                    <div class="bus-info">
+                        <h3>${bus.company}</h3>
+                        <p>${bus.from} → ${bus.to} | Depart: ${bus.departure}</p>
+                        <p><strong>${seatStatus}</strong></p>
+                        <button onclick="toggleBusDetails(${bus.id})">${showDetails ? 'Hide Details' : 'Show Details'}</button>
+                        <div class="details-panel" id="details-${bus.id}" style="${showDetails ? 'display:block' : 'display:none'}">
+                            <p>⏱️ Duration: ${bus.duration}</p>
+                            <p>💰 Price per seat: $${bus.price}</p>
+                            <p>💺 Total seats: ${bus.seats}</p>
+                            ${!isFull ? `<button onclick="openSeatSelection(${bus.id})">Select Seats</button>` : '<button disabled style="background:#ccc;">Bus Full</button>'}
+                        </div>
+                    </div>
                 </div>
             `;
         }
         container.innerHTML = html;
+    }
+
+    function toggleBusDetails(busId) {
+        if (expandedBusId === busId) {
+            expandedBusId = null;
+        } else {
+            expandedBusId = busId;
+        }
+        displayBuses();
     }
 
     function openSeatSelection(busId) {
@@ -117,7 +186,7 @@
         let modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
-        modal.innerHTML = `<div class="modal-content"><h3>Select seats (max 6)</h3>${seatHtml}<button class="cancel-btn" onclick="closeModal(this)">Cancel</button></div>`;
+        modal.innerHTML = `<div class="modal-content"><h3>Select seats (max 6)</h3>${seatHtml}<button class="cancel-btn" onclick="closeModal(this)" style="background:#999; margin-top:10px;">Cancel</button></div>`;
         document.body.appendChild(modal);
         document.querySelectorAll('.seat').forEach(seat => {
             seat.onclick = () => {
@@ -146,11 +215,15 @@
         document.getElementById('paymentModal').style.display = 'flex';
     }
 
+    function generate28DigitCode() {
+        return Math.random().toString().slice(2, 30).padEnd(28, '0');
+    }
+
     function processPayment() {
         let phone = document.getElementById('phoneNumber').value;
         let provider = document.getElementById('mobileMoneyProvider').value;
         if (!phone) { showToast("Enter phone number", "error"); return; }
-        let code = Math.floor(100000 + Math.random() * 900000);
+        let code = generate28DigitCode();
         let booking = {
             id: Date.now(),
             bus: selectedBus.company,
@@ -160,24 +233,54 @@
             phone: phone,
             total: selectedSeats.length * selectedBus.price,
             code: code,
-            provider: provider
+            provider: provider,
+            presented: false   // red dot initially
         };
         let bookings = JSON.parse(localStorage.getItem('customer_bookings') || '[]');
-        bookings.push(booking);
+        bookings.unshift(booking); // newest first
         localStorage.setItem('customer_bookings', JSON.stringify(bookings));
         selectedBus.available -= selectedSeats.length;
+        localStorage.setItem('company_buses', JSON.stringify(buses));
         closePaymentModal();
         document.getElementById('uniqueCode').innerText = code;
         document.getElementById('codeModal').style.display = 'flex';
+        loadRecentBookings(); // refresh history
+        searchBuses(); // refresh bus list
     }
 
-    function closePaymentModal() {
-        document.getElementById('paymentModal').style.display = 'none';
+    function loadRecentBookings() {
+        let bookings = JSON.parse(localStorage.getItem('customer_bookings') || '[]');
+        const container = document.getElementById('recentBookingsList');
+        if (bookings.length === 0) {
+            container.innerHTML = '<p class="small-text">No bookings yet</p>';
+            return;
+        }
+        let html = '';
+        bookings.forEach(b => {
+            html += `
+                <div class="history-item">
+                    <div class="flex-between">
+                        <strong>${b.bus}</strong>
+                        <span class="small-text">${b.date}</span>
+                    </div>
+                    <p>${b.route} | Seats: ${b.seats.join(',')} | Total: $${b.total}</p>
+                    <p class="small-text">Code: ${b.code}</p>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
     }
-    function closeCodeModal() {
-        document.getElementById('codeModal').style.display = 'none';
-        searchBuses();
+
+    function clearHistory() {
+        if (confirm("Delete all your booking history?")) {
+            localStorage.removeItem('customer_bookings');
+            loadRecentBookings();
+            showToast("History cleared");
+        }
     }
+
+    function closePaymentModal() { document.getElementById('paymentModal').style.display = 'none'; }
+    function closeCodeModal() { document.getElementById('codeModal').style.display = 'none'; }
     function showToast(msg, type) {
         let toast = document.getElementById('toast');
         toast.innerText = msg;
@@ -185,6 +288,9 @@
         setTimeout(() => toast.style.display = 'none', 3000);
     }
     function closeModal(btn) { btn.parentElement.parentElement.remove(); }
+
+    document.getElementById('clearHistoryBtn').onclick = clearHistory;
+    loadRecentBookings();
     searchBuses();
 </script>
 </body>
