@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:system-ui;background:#f0f0f0;padding:1rem;color:#000;}
+        .container{max-width:1000px;margin:0 auto;}
+        .card{background:white;border-radius:20px;padding:1.5rem;margin-bottom:1rem;}
+        input,button{width:100%;padding:10px;margin:6px 0;border-radius:12px;border:1px solid #ddd;}
+        button{background:#ff7e00;color:white;border:none;cursor:pointer;font-weight:bold;}
+        table{width:100%;border-collapse:collapse;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background:#ff7e00;color:white;}
+        .suspend{background:#e74c3c;color:white;border:none;padding:5px 10px;border-radius:8px;}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="adminLogin" class="card">
+        <h2>Admin Login</h2>
+        <input type="text" id="adminUser" placeholder="Username">
+        <input type="password" id="adminPass" placeholder="Password">
+        <button onclick="adminLogin()">Login</button>
+        <p>Demo: admin / admin123</p>
+    </div>
+    <div id="adminDashboard" style="display:none;">
+        <div class="card">
+            <h2>🛠️ Admin Dashboard <button onclick="adminLogout()">Logout</button></h2>
+            <h3>Add Bus</h3>
+            <input id="newCompany" placeholder="Company"><input id="newFrom" placeholder="From"><input id="newTo" placeholder="To">
+            <input id="newDeparture" type="time"><input id="newDuration" placeholder="Duration"><input id="newPrice" type="number" placeholder="Price"><input id="newSeats" type="number" placeholder="Seats">
+            <button onclick="adminAddBus()">Add Bus</button>
+        </div>
+        <div class="card">
+            <h3>All Buses</h3>
+            <table><thead><tr><th>ID</th><th>Company</th><th>Route</th><th>Price</th><th>Status</th><th>Action</th></tr></thead><tbody id="busesTbody"></tbody></table>
+        </div>
+        <div class="card">
+            <h3>Company Subscriptions</h3>
+            <table><thead><tr><th>Company</th><th>Paid?</th><th>Action</th></tr></thead><tbody id="subsTbody"></tbody></table>
+        </div>
+    </div>
+</div>
+<script>
+    if (!localStorage.getItem('company_buses')) localStorage.setItem('company_buses', JSON.stringify([]));
+    function adminLogin() {
+        let u = document.getElementById('adminUser').value, p = document.getElementById('adminPass').value;
+        if (u === "admin" && p === "admin123") {
+            document.getElementById('adminLogin').style.display = 'none';
+            document.getElementById('adminDashboard').style.display = 'block';
+            loadAllBuses(); loadSubscriptions();
+        } else alert("Invalid");
+    }
+    function loadAllBuses() {
+        let buses = JSON.parse(localStorage.getItem('company_buses'));
+        let tbody = document.getElementById('busesTbody');
+        if (!buses.length) { tbody.innerHTML = '<tr><td colspan="6">No buses</td></tr>'; return; }
+        let rows = '';
+        buses.forEach(b => {
+            rows += `<tr><td>${b.id}</td><td>${b.company}</td><td>${b.from}→${b.to}</td><td>$${b.price}</td><td>${b.suspended ? 'Suspended' : 'Active'}</td><td><button class="suspend" onclick="toggleSuspend(${b.id})">${b.suspended ? 'Activate' : 'Suspend'}</button></td></tr>`;
+        });
+        tbody.innerHTML = rows;
+    }
+    function toggleSuspend(id) {
+        let buses = JSON.parse(localStorage.getItem('company_buses'));
+        let bus = buses.find(b => b.id === id);
+        bus.suspended = !bus.suspended;
+        localStorage.setItem('company_buses', JSON.stringify(buses));
+        loadAllBuses();
+    }
+    function adminAddBus() {
+        let company = document.getElementById('newCompany').value, from = document.getElementById('newFrom').value, to = document.getElementById('newTo').value;
+        let departure = document.getElementById('newDeparture').value, duration = document.getElementById('newDuration').value;
+        let price = parseInt(document.getElementById('newPrice').value), seats = parseInt(document.getElementById('newSeats').value);
+        if (!company || !from || !to || !price) { alert("Fill required"); return; }
+        let buses = JSON.parse(localStorage.getItem('company_buses'));
+        buses.push({ id: Date.now(), company, from, to, departure, duration, price, seats, available: seats, suspended: false });
+        localStorage.setItem('company_buses', JSON.stringify(buses));
+        alert("Bus added");
+        loadAllBuses();
+    }
+    function loadSubscriptions() {
+        let buses = JSON.parse(localStorage.getItem('company_buses'));
+        let companies = [...new Set(buses.map(b => b.company))];
+        let tbody = document.getElementById('subsTbody');
+        if (!companies.length) { tbody.innerHTML = '<tr><td colspan="3">No companies</td></tr>'; return; }
+        let rows = '';
+        companies.forEach(c => {
+            let paid = localStorage.getItem(`sub_${c}`) === 'true' ? "Yes" : "No";
+            rows += `<tr><td>${c}</td><td>${paid}</td><td><button onclick="markPaid('${c}')">Mark Paid</button></td></tr>`;
+        });
+        tbody.innerHTML = rows;
+    }
+    function markPaid(company) { localStorage.setItem(`sub_${company}`, 'true'); loadSubscriptions(); }
+    function adminLogout() { document.getElementById('adminLogin').style.display = 'block'; document.getElementById('adminDashboard').style.display = 'none'; }
+</script>
+</body>
+</html>
