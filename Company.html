@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Dashboard | BusTicket</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 2rem 1rem;
+        }
+        .dashboard-container { max-width: 1280px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+            padding: 1.8rem;
+            margin-bottom: 2rem;
+            border: 1px solid #e2e8f0;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        h2 { font-size: 1.5rem; font-weight: 600; }
+        h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: #1e293b; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        input, select, button {
+            padding: 0.75rem 1rem;
+            border-radius: 60px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.9rem;
+            width: 100%;
+            background: white;
+        }
+        button {
+            background: #ff7e00;
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #e66900; }
+        .search-container {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            align-items: center;
+        }
+        .search-container input {
+            flex: 1;
+            border-radius: 40px;
+            padding-left: 1.2rem;
+        }
+        .search-icon {
+            background: #e4e6eb;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .search-icon:hover { background: #d8dadf; }
+        .search-icon span { font-size: 1.2rem; }
+        .bus-item {
+            background: #f8fafc;
+            border-radius: 24px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+        .bus-info { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .bus-logo-preview { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
+        .bus-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+        .bus-actions input { width: 130px; }
+        .day-group {
+            background: #fefce8;
+            border-radius: 20px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .day-title { font-weight: bold; border-bottom: 2px solid #ffedc0; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        .booking-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0.8rem 0;
+        }
+        .green-dot, .red-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
+        .green-dot { background: #10b981; }
+        .red-dot { background: #ef4444; }
+        .logout-btn { background: #334155; }
+        .password-hint { font-size: 0.7rem; color: #64748b; margin-top: 0.2rem; }
+        @media (max-width: 768px) {
+            .bus-item { flex-direction: column; align-items: stretch; }
+            .bus-actions { justify-content: space-between; }
+        }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+<div class="dashboard-container">
+    <!-- Login Card -->
+    <div id="loginDiv" class="card">
+        <h2>Company Portal</h2>
+        <p style="margin-bottom: 1.5rem; color: #475569;">Sign in to manage your buses and view bookings</p>
+        <input type="email" id="compEmail" placeholder="Email address" style="margin-bottom: 1rem;">
+        <input type="password" id="compPassword" placeholder="Password" style="margin-bottom: 1.5rem;">
+        <button onclick="loginCompany()" style="width: auto; padding: 0.75rem 2rem;">Login →</button>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboardDiv" style="display: none;">
+        <div class="card">
+            <div class="card-header">
+                <h2>🚌 Company Dashboard</h2>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <label style="font-size:0.85rem;">Theme color:</label>
+                    <input type="color" id="themeColor" value="#ff7e00" style="width: 48px; height: 40px; padding: 0; border-radius: 12px;">
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Change payment number (with second password) -->
+        <div class="card">
+            <h3>💰 Change payment mobile number</h3>
+            <p style="margin-bottom: 1rem; font-size: 0.85rem;">Customers will pay to this number. You need a transaction password to change it.</p>
+            <div class="form-grid">
+                <input type="tel" id="newPaymentNumber" placeholder="New mobile money number">
+                <input type="password" id="transactionPassword" placeholder="Transaction password">
+                <button onclick="changePaymentNumber()">Update payment number</button>
+            </div>
+            <div id="paymentNumberStatus" style="margin-top: 0.5rem; font-size: 0.85rem;"></div>
+        </div>
+
+        <!-- Add Bus -->
+        <div class="card">
+            <h3>➕ Add a new bus</h3>
+            <div class="form-grid">
+                <input id="newFrom" placeholder="From city">
+                <input id="newTo" placeholder="To city">
+                <input id="newDeparture" type="time">
+                <input id="newDuration" placeholder="Duration (e.g., 5h)">
+                <input id="newPrice" type="number" placeholder="Price per seat">
+                <input id="newSeats" type="number" placeholder="Total seats">
+                <input id="newLogo" placeholder="Company logo URL (square image)">
+            </div>
+            <div style="display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0 1rem;">
+                <img id="logoPreview" style="width: 48px; height: 48px; border-radius: 50%; display: none;">
+                <span style="font-size:0.8rem; color:#64748b;">Logo preview will appear here</span>
+            </div>
+            <button onclick="addBus()" style="width: auto; padding: 0.6rem 2rem;">+ Add bus</button>
+        </div>
+
+        <!-- Your Buses -->
+        <div class="card">
+            <h3>📋 Your buses</h3>
+            <div id="busesList"></div>
+        </div>
+
+        <!-- Bookings with Facebook-style search -->
+        <div class="card">
+            <h3>📖 Bookings (newest to oldest)</h3>
+            <div class="search-container">
+                <input type="text" id="searchBookingsInput" placeholder="Search by passenger name or booking code...">
+                <div class="search-icon" onclick="filterBookings()">
+                    <span>🔍</span>
+                </div>
+            </div>
+            <div id="bookingsGrouped"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Firebase config – replace with your own web app config
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const API_URL = 'http://localhost:3000/api';
+    let currentToken = null;
+    let allRawBookings = {}; // store grouped bookings for filtering
+
+    // Theme
+    function applyTheme() {
+        const color = document.getElementById('themeColor').value;
+        localStorage.setItem('companyThemeColor', color);
+        document.querySelectorAll('button:not(.logout-btn)').forEach(btn => {
+            btn.style.backgroundColor = color;
+        });
+        document.querySelectorAll('.day-group').forEach(g => g.style.borderLeft = `3px solid ${color}`);
+    }
+    function loadTheme() {
+        const saved = localStorage.getItem('companyThemeColor');
+        if(saved) {
+            document.getElementById('themeColor').value = saved;
+            applyTheme();
+        }
+    }
+
+    async function loginCompany() {
+        const email = document.getElementById('compEmail').value;
+        const pwd = document.getElementById('compPassword').value;
+        try {
+            const cred = await auth.signInWithEmailAndPassword(email, pwd);
+            currentToken = await cred.user.getIdToken();
+            document.getElementById('loginDiv').style.display = 'none';
+            document.getElementById('dashboardDiv').style.display = 'block';
+            loadTheme();
+            loadBuses();
+            loadBookings();
+            loadPaymentNumber();
+        } catch (err) {
+            alert("Login failed: " + err.message);
+        }
+    }
+
+    async function loadPaymentNumber() {
+        // Fetch from backend (requires endpoint)
+        try {
+            const res = await fetch(`${API_URL}/company/payment-number`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('paymentNumberStatus').innerHTML = `Current payment number: ${data.number}`;
+            }
+        } catch(e) { console.log(e); }
+    }
+
+    async function changePaymentNumber() {
+        const newNumber = document.getElementById('newPaymentNumber').value;
+        const txnPass = document.getElementById('transactionPassword').value;
+        if (!newNumber || !txnPass) { alert("Please enter both new number and transaction password"); return; }
+        const res = await fetch(`${API_URL}/company/change-payment-number`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+            body: JSON.stringify({ newNumber, transactionPassword: txnPass })
+        });
+        if (res.ok) {
+            alert("Payment number updated successfully");
+            loadPaymentNumber();
+        } else {
+            const err = await res.json();
+            alert("Failed: " + (err.error || "Wrong transaction password"));
+        }
+    }
+
+    async function loadBuses() {
+        const res = await fetch(`${API_URL}/company/buses`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+        const buses = await res.json();
+        const container = document.getElementById('busesList');
+        if (!buses.length) { container.innerHTML = "<p style='color:#64748b;'>No buses added yet.</p>"; return; }
+        container.innerHTML = buses.map(b => `
+            <div class="bus-item">
+                <div class="bus-info">
+                    <img class="bus-logo-preview" src="${b.logo || 'https://via.placeholder.com/48'}" onerror="this.src='https://via.placeholder.com/48'">
+                    <div>
+                        <strong>${b.from} → ${b.to}</strong><br>
+                        Departure: ${b.departure} | Duration: ${b.duration}<br>
+                        Price: $${b.price} | Available: ${b.availableSeats}/${b.totalSeats}
+                    </div>
+                </div>
+                <div class="bus-actions">
+                    <input id="price_${b.id}" type="number" placeholder="New price" style="width: 120px;">
+                    <button onclick="updateBus('${b.id}')">Update price</button>
+                    <input id="logo_${b.id}" placeholder="New logo URL" style="width: 160px;">
+                    <button onclick="updateLogo('${b.id}')">Update logo</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function updateBus(busId) {
+        const newPrice = document.getElementById(`price_${busId}`).value;
+        if (!newPrice) return;
+        await fetch(`${API_URL}/company/buses/${busId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+            body: JSON.stringify({ price: parseInt(newPrice) })
+        });
+        loadBuses();
+    }
+
+    async function updateLogo(busId) {
+        const newLogo = document.getElementById(`logo_${busId}`).value;
+        if (!newLogo) return;
+        await fetch(`${API_URL}/company/buses/${busId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+            body: JSON.stringify({ logo: newLogo })
+        });
+        loadBuses();
+    }
+
+    async function addBus() {
+        const from = document.getElementById('newFrom').value;
+        const to = document.getElementById('newTo').value;
+        const departure = document.getElementById('newDeparture').value;
+        const duration = document.getElementById('newDuration').value;
+        const price = parseInt(document.getElementById('newPrice').value);
+        const totalSeats = parseInt(document.getElementById('newSeats').value);
+        const logo = document.getElementById('newLogo').value;
+        if (!from || !to || !price) { alert("Please fill in at least From, To and Price"); return; }
+        await fetch(`${API_URL}/company/buses`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+            body: JSON.stringify({ from, to, departure, duration, price, totalSeats, logo })
+        });
+        loadBuses();
+        ['newFrom','newTo','newDeparture','newDuration','newPrice','newSeats','newLogo'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('logoPreview').style.display = 'none';
+    }
+
+    async function loadBookings() {
+        const res = await fetch(`${API_URL}/company/bookings`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+        allRawBookings = await res.json();
+        filterBookings();
+    }
+
+    function filterBookings() {
+        const searchTerm = document.getElementById('searchBookingsInput').value.toLowerCase();
+        const container = document.getElementById('bookingsGrouped');
+        if (Object.keys(allRawBookings).length === 0) {
+            container.innerHTML = "<p>No bookings yet.</p>";
+            return;
+        }
+        let filteredGrouped = {};
+        for (let date in allRawBookings) {
+            let filtered = allRawBookings[date].filter(b => 
+                b.passengerName.toLowerCase().includes(searchTerm) || 
+                b.code.toLowerCase().includes(searchTerm)
+            );
+            if (filtered.length) filteredGrouped[date] = filtered;
+        }
+        if (Object.keys(filteredGrouped).length === 0) {
+            container.innerHTML = "<p>No matching bookings found.</p>";
+            return;
+        }
+        let html = '';
+        for (let date of Object.keys(filteredGrouped).sort().reverse()) {
+            html += `<div class="day-group"><div class="day-title">📅 ${date}</div>`;
+            filteredGrouped[date].forEach(b => {
+                html += `<div class="booking-row">
+                    <div><span class="${b.presented ? 'green-dot' : 'red-dot'}"></span> <strong>${b.busName}</strong> | ${b.route}</div>
+                    <div>Seats: ${b.seats} | ${b.passengerName} | ${b.phone}</div>
+                    <div>Code: ${b.code} ${!b.presented ? `<button onclick="markPresented('${b.id}')" style="width:auto; padding:0.2rem 0.8rem;">Mark presented</button>` : ''}</div>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    async function markPresented(bookingId) {
+        await fetch(`${API_URL}/company/bookings/${bookingId}/present`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        loadBookings();
+    }
+
+    function logout() { auth.signOut(); location.reload(); }
+
+    document.getElementById('newLogo').addEventListener('input', function() {
+        const preview = document.getElementById('logoPreview');
+        if(this.value) { preview.src = this.value; preview.style.display = 'inline-block'; }
+        else preview.style.display = 'none';
+    });
+    document.getElementById('themeColor').addEventListener('change', applyTheme);
+    document.getElementById('searchBookingsInput').addEventListener('keyup', function(e) { if(e.key === 'Enter') filterBookings(); });
+</script>
+</body>
+</html>
