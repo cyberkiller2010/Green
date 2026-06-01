@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | BusTicket</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:system-ui;background:#f0f0f0;padding:1rem;color:#000;}
+        .container{max-width:1000px;margin:0 auto;}
+        .card{background:white;border-radius:20px;padding:1.5rem;margin-bottom:1rem;}
+        input,button{width:100%;padding:10px;margin:6px 0;border-radius:12px;border:1px solid #ddd;}
+        button{background:#ff7e00;color:white;border:none;cursor:pointer;font-weight:bold;}
+        table{width:100%;border-collapse:collapse;margin-top:1rem;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background:#ff7e00;color:white;}
+        .green-dot{display:inline-block;width:12px;height:12px;background:green;border-radius:50%;margin-right:6px;}
+        .red-dot{display:inline-block;width:12px;height:12px;background:red;border-radius:50%;margin-right:6px;}
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+<div class="container">
+    <div id="adminLogin" class="card">
+        <h2>Admin Login</h2>
+        <input type="email" id="adminEmail" placeholder="Admin Email">
+        <input type="password" id="adminPassword" placeholder="Password">
+        <button onclick="loginAdmin()">Login</button>
+        <p>Use the admin user you created in Firebase Authentication.</p>
+    </div>
+    <div id="adminDashboard" style="display:none;">
+        <div class="card">
+            <h2>🛠️ Admin Dashboard <button onclick="logout()">Logout</button></h2>
+            <h3>➕ Add Company</h3>
+            <input id="compName" placeholder="Company Name"><input id="compEmail" placeholder="Company Email"><input id="compPass" placeholder="Temporary Password">
+            <button onclick="addCompany()">Add Company</button>
+        </div>
+        <div class="card">
+            <h3>Companies & Payment Status</h3>
+            <table><thead><th>Name</th><th>Paid</th><th>Suspended</th><th>Actions</th></thead><tbody id="companiesTbody"></tbody></table>
+        </div>
+    </div>
+</div>
+<script>
+    // TODO: ADD YOUR FIREBASE WEB CONFIG HERE (same as company.html)
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const API_URL = 'http://localhost:3000/api';
+    let adminToken = null;
+
+    async function loginAdmin() {
+        const email = document.getElementById('adminEmail').value;
+        const pwd = document.getElementById('adminPassword').value;
+        try {
+            const cred = await auth.signInWithEmailAndPassword(email, pwd);
+            adminToken = await cred.user.getIdToken();
+            document.getElementById('adminLogin').style.display = 'none';
+            document.getElementById('adminDashboard').style.display = 'block';
+            loadCompanies();
+        } catch (err) {
+            alert("Admin login failed: " + err.message);
+        }
+    }
+
+    async function loadCompanies() {
+        const res = await fetch(`${API_URL}/admin/companies`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+        const companies = await res.json();
+        const tbody = document.getElementById('companiesTbody');
+        tbody.innerHTML = companies.map(c => `
+            <tr>
+                <td>${c.name}</td>
+                <td><span class="${c.subscriptionPaid ? 'green-dot' : 'red-dot'}"></span> ${c.subscriptionPaid ? 'Paid' : 'Unpaid'}</td>
+                <td>${c.suspended ? 'Yes' : 'No'}</td>
+                <td>
+                    <button onclick="togglePayment('${c.id}', ${!c.subscriptionPaid})">${c.subscriptionPaid ? 'Mark Unpaid' : 'Mark Paid'}</button>
+                    <button onclick="toggleSuspend('${c.id}', ${!c.suspended})">${c.suspended ? 'Activate' : 'Suspend'}</button>
+                </td>
+            </table>
+        `).join('');
+    }
+
+    async function togglePayment(companyId, paid) {
+        await fetch(`${API_URL}/admin/companies/${companyId}/payment`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+            body: JSON.stringify({ paid })
+        });
+        loadCompanies();
+    }
+
+    async function toggleSuspend(companyId, suspended) {
+        await fetch(`${API_URL}/admin/companies/${companyId}/suspend`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+            body: JSON.stringify({ suspended })
+        });
+        loadCompanies();
+    }
+
+    async function addCompany() {
+        const name = document.getElementById('compName').value;
+        const email = document.getElementById('compEmail').value;
+        const password = document.getElementById('compPass').value;
+        if (!name || !email || !password) { alert("Fill all fields"); return; }
+        await fetch(`${API_URL}/admin/companies`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+            body: JSON.stringify({ name, email, password })
+        });
+        alert("Company added. They can login with the provided email and password.");
+        loadCompanies();
+    }
+
+    function logout() { auth.signOut(); location.reload(); }
+</script>
+</body>
+</html>
